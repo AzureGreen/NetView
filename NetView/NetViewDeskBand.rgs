@@ -1,0 +1,16 @@
+HKCR
+{
+	NoRemove CLSID
+	{
+		ForceRemove {2D1DD8A1-4C3E-4DBD-9E4D-ECBFE406B726} = s 'NetView'
+		{
+			ForceRemove Programmable
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			TypeLib = s '{B8321A6E-AC17-4004-8D3B-E65074F5EE15}'
+			Version = s '1.0'
+		}
+	}
+}
