@@ -2,6 +2,8 @@
 #include <WinSock2.h>
 #include <IPHlpApi.h>
 #include <string>
+#include <vector>
+#include <codecvt>
 
 #pragma comment(lib, "IPHlpApi.lib")
 
@@ -35,6 +37,7 @@ public:
 				return;
 			}
 		}
+		StoreAdapterInfo();
 	}
 
 	virtual ~CNetViewUtil()
@@ -47,13 +50,56 @@ public:
 		}
 	}
 
-	void CalculateNetOctets(void)
+	void StoreAdapterInfo(void)
 	{
-		if (m_pIfTable == nullptr)
+		DWORD size = sizeof(IP_ADAPTER_ADDRESSES);
+		PIP_ADAPTER_ADDRESSES pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(MALLOC(size));
+		if (pAddresses == nullptr)
 		{
 			return;
 		}
 
+		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == ERROR_BUFFER_OVERFLOW)
+		{
+			FREE(pAddresses);
+			pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(MALLOC(size));
+			if (pAddresses == nullptr)
+			{
+				return;
+			}
+		}
+
+		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == NO_ERROR)
+		{
+			for (PIP_ADAPTER_ADDRESSES pCurrentAddresses = pAddresses; pCurrentAddresses != nullptr; pCurrentAddresses = pCurrentAddresses->Next)
+			{
+				m_vecAdapterName.push_back(pCurrentAddresses->AdapterName);
+			}
+		}
+	}
+
+	std::string wstr2str(std::wstring wstr)
+	{
+		std::wstring_convert<std::codecvt<wchar_t, char, std::mbstate_t>> Cvt;
+		std::string str = Cvt.to_bytes(wstr);
+		return (!str.empty()) ? str : std::string();
+	}
+
+	bool IsAdapterInuse(std::string strAdapterName)
+	{
+		if (strAdapterName.empty()) return false;
+
+		for (auto iter = m_vecAdapterName.cbegin(); iter != m_vecAdapterName.cend(); iter++)
+		{
+			int index = strAdapterName.find(*iter);
+			if (index != strAdapterName.length() && index >= 0) return true;
+		}
+		return false;
+	}
+
+	void CalculateNetOctets(void)
+	{
+		if (m_pIfTable == nullptr) return;
 
 		DWORD	dwInOctets = 0;			// total received 
 		DWORD	dwOutOctets = 0;		// total sent
@@ -69,6 +115,8 @@ public:
 		{
 			PMIB_IFROW pIfRow = &m_pIfTable->table[i];
 			/*if (pIfRow->dwType != MIB_IF_TYPE_LOOPBACK)*/
+			// transform wchar to char
+			if (IsAdapterInuse(wstr2str(pIfRow->wszName)))
 			{
 				dwInOctets += pIfRow->dwInOctets;
 				dwOutOctets += pIfRow->dwOutOctets;
@@ -133,4 +181,6 @@ private:
 	DWORD			m_dwPreTime;			// previous time
 	std::wstring	m_strRecvSpeed;
 	std::wstring	m_strSendSpeed;
+
+	std::vector<std::string> m_vecAdapterName;
 };
