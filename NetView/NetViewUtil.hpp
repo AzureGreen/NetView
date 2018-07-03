@@ -114,7 +114,7 @@ public:
 		for (DWORD i = 0; i < m_pIfTable->dwNumEntries; i++)
 		{
 			PMIB_IFROW pIfRow = &m_pIfTable->table[i];
-			/*if (pIfRow->dwType != MIB_IF_TYPE_LOOPBACK)*/
+
 			// transform wchar to char
 			if (IsAdapterInuse(wstr2str(pIfRow->wszName)))
 			{
@@ -138,28 +138,28 @@ public:
 			// transform unit for recv(download speed)
 			if (CurrentInOctets / 1024 < 1)		// byte/s
 			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.2lfb/s", CurrentInOctets / dTime);
+				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.0lf B/s", CurrentInOctets / dTime);
 			}
 			else if (CurrentInOctets / (1024 * 1024) < 1)	// kb/s
 			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.2lfkb/s", (CurrentInOctets / 1024) / dTime);
+				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.0lf KB/s", (CurrentInOctets / 1024) / dTime);
 			}
 			else  // mb/s			generally, net speed will be smaller than gb/s, so I won't consider more than mb/s.
 			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.2lfmb/s", (CurrentInOctets / pow(1024, 2)) / dTime);
+				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.1lf MB/s", (CurrentInOctets / pow(1024, 2)) / dTime);
 			}
 			// transform unit for send(upload speed)
 			if (CurrentOutOctets / 1024 < 1)		// byte/s
 			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.2lfb/s", CurrentOutOctets / dTime);
+				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.0lf B/s", CurrentOutOctets / dTime);
 			}
 			else if (CurrentOutOctets / (1024 * 1024) < 1)	// kb/s
 			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.2lfkb/s", (CurrentOutOctets / 1024) / dTime);
+				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.0lf KB/s", (CurrentOutOctets / 1024) / dTime);
 			}
 			else  // mb/s			generally, net speed will be smaller than gb/s, so I won't consider more than mb/s.
 			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.2lfmb/s", (CurrentOutOctets / pow(1024, 2)) / dTime);
+				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.1lf MB/s", (CurrentOutOctets / pow(1024, 2)) / dTime);
 			}
 		}
 

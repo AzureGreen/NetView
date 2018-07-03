@@ -94,8 +94,6 @@ STDMETHODIMP CNetViewDeskBand::GetBandInfo(DWORD dwBandID, DWORD dwViewMode, DES
 		if (pdbi->dwMask & DBIM_MINSIZE)
 		{
 			pdbi->ptMinSize = m_NetViewWnd.CalcWindowSize();
-			//pdbi->ptMinSize.x = 200;
-			//pdbi->ptMinSize.y = 30;
 		}
 		if (pdbi->dwMask & DBIM_MAXSIZE)
 		{
@@ -108,8 +106,6 @@ STDMETHODIMP CNetViewDeskBand::GetBandInfo(DWORD dwBandID, DWORD dwViewMode, DES
 		if (pdbi->dwMask & DBIM_ACTUAL)
 		{
 			pdbi->ptActual = m_NetViewWnd.CalcWindowSize();
-			//pdbi->ptMinSize.x = 200;
-			//pdbi->ptMinSize.y = 30;
 		}
 		if (pdbi->dwMask & DBIM_TITLE)
 		{
