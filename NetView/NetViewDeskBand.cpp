@@ -2,7 +2,7 @@
 
 #include "stdafx.h"
 #include "NetViewDeskBand.h"
-
+#include <strsafe.h>
 
 // CNetViewDeskBand
 
@@ -109,14 +109,14 @@ STDMETHODIMP CNetViewDeskBand::GetBandInfo(DWORD dwBandID, DWORD dwViewMode, DES
 		}
 		if (pdbi->dwMask & DBIM_TITLE)
 		{
-			//if (dwViewMode == DBIF_VIEWMODE_FLOATING)
-			//{
-			//	StringCchCopy(pdbi->wszTitle, lstrlen(L"NetView") + 1, L"NetView");
-			//}
-			//else
-			//{
-			pdbi->dwMask &= ~DBIM_TITLE;	// do not show the title
-											//}
+			if (dwViewMode == DBIF_VIEWMODE_FLOATING)
+			{
+				StringCchCopy(pdbi->wszTitle, lstrlen(L"NetView") + 1, L"NetView");
+			}
+			else
+			{
+				pdbi->dwMask &= ~DBIM_TITLE;	// do not show the title
+			}
 		}
 		if (pdbi->dwMask & DBIM_MODEFLAGS)
 		{

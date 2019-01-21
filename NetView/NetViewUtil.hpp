@@ -76,12 +76,16 @@ public:
 				m_vecAdapterName.push_back(pCurrentAddresses->AdapterName);
 			}
 		}
+
+		FREE(pAddresses);
 	}
 
 	std::string wstr2str(std::wstring wstr)
 	{
-		std::wstring_convert<std::codecvt<wchar_t, char, std::mbstate_t>> Cvt;
-		std::string str = Cvt.to_bytes(wstr);
+		// consider the my system's GBK
+		typedef std::codecvt_byname<wchar_t, char, std::mbstate_t> cvt_facet;
+		std::wstring_convert<cvt_facet> conv(new cvt_facet(".936"));
+		std::string str = conv.to_bytes(wstr);
 		return (!str.empty()) ? str : std::string();
 	}
 
@@ -89,9 +93,9 @@ public:
 	{
 		if (strAdapterName.empty()) return false;
 
-		for (auto iter = m_vecAdapterName.cbegin(); iter != m_vecAdapterName.cend(); iter++)
+		for (auto i : m_vecAdapterName)
 		{
-			int index = strAdapterName.find(*iter);
+			int index = strAdapterName.find(i);
 			if (index != strAdapterName.length() && index >= 0) return true;
 		}
 		return false;
@@ -130,36 +134,38 @@ public:
 		
 		if (m_bFirst)
 		{
+			m_strRecvSpeed = L"¡ý 0 B/s";
+			m_strSendSpeed = L"¡ü 0 B/s";
 			m_bFirst = FALSE;
 		}
 		else
 		{
 			DOUBLE dTime = (static_cast<DOUBLE>(dwTime - m_dwPreTime) / 1000.0f);
 			// transform unit for recv(download speed)
-			if (CurrentInOctets / 1024 < 1)		// byte/s
+			if (CurrentInOctets / 1000 < 1)		// B/s
 			{
 				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.0lf B/s", CurrentInOctets / dTime);
 			}
-			else if (CurrentInOctets / (1024 * 1024) < 1)	// kb/s
+			else if (CurrentInOctets / (1000 * 1000) < 1)	// KB/s
 			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.0lf KB/s", (CurrentInOctets / 1024) / dTime);
+				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.0lf KB/s", (CurrentInOctets / 1000) / dTime);
 			}
-			else  // mb/s			generally, net speed will be smaller than gb/s, so I won't consider more than mb/s.
+			else  // MB/s			generally, net speed will be smaller than GB/s, so I won't consider more than MB/s.
 			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.1lf MB/s", (CurrentInOctets / pow(1024, 2)) / dTime);
+				m_strRecvSpeed = std::_Floating_to_wstring(L"¡ý %.1lf MB/s", (CurrentInOctets / (1000 * 1000)) / dTime);
 			}
 			// transform unit for send(upload speed)
-			if (CurrentOutOctets / 1024 < 1)		// byte/s
+			if (CurrentOutOctets / 1000 < 1)		// B/s
 			{
 				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.0lf B/s", CurrentOutOctets / dTime);
 			}
-			else if (CurrentOutOctets / (1024 * 1024) < 1)	// kb/s
+			else if (CurrentOutOctets / (1000 * 1000) < 1)	// KB/s
 			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.0lf KB/s", (CurrentOutOctets / 1024) / dTime);
+				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.0lf KB/s", (CurrentOutOctets / 1000) / dTime);
 			}
-			else  // mb/s			generally, net speed will be smaller than gb/s, so I won't consider more than mb/s.
+			else  // MB/s			generally, net speed will be smaller than GB/s, so I won't consider more than MB/s.
 			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.1lf MB/s", (CurrentOutOctets / pow(1024, 2)) / dTime);
+				m_strSendSpeed = std::_Floating_to_wstring(L"¡ü %.1lf MB/s", (CurrentOutOctets / (1000 * 1000)) / dTime);
 			}
 		}
 

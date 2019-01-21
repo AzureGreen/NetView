@@ -76,6 +76,8 @@ LRESULT CNetViewWnd::OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL & bHa
 	PAINTSTRUCT ps = { 0 };
 	HDC hdc = BeginPaint(&ps);	//  prepares the specified window for painting &  fills a PAINTSTRUCT structure with information about the painting.
 
+	int x = ps.rcPaint.left;
+
 	std::wstring strRecv = m_NetViewUtil.GetRecvSpeed();
 	std::wstring strSend = m_NetViewUtil.GetSendSpeed();
 
@@ -85,24 +87,26 @@ LRESULT CNetViewWnd::OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL & bHa
 		GetClientRect(&rc);
 
 		HTHEME hTheme = ::OpenThemeData(NULL, L"TextStyle");
+
 		if (hTheme)
 		{
-			HDC hdcPaint = NULL;
-			HPAINTBUFFER hBufferedPaint = ::BeginBufferedPaint(hdc, &rc, BPBF_TOPDOWNDIB, NULL, &hdcPaint);
-			
+			HDC hMemDC = ::CreateCompatibleDC(hdc);
+			HBITMAP hMemBitMap = ::CreateCompatibleBitmap(hdc, RECTWIDTH(rc), RECTHEIGHT(rc));
+			HBITMAP hOldMemBitMap = static_cast<HBITMAP>(::SelectObject(hMemDC, hMemBitMap));
+
 			// before other operations, draw the background
-			::DrawThemeParentBackground(m_hWnd, hdcPaint, &rc);
-			
+			//::DrawThemeParentBackground(m_hWnd, hMemDC, &rc);
+
 			// set font
-			HFONT hFont = ::CreateFontW(m_iHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS, 
+			HFONT hFont = ::CreateFontW(m_iHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS,
 				CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"@system");
-			HFONT hOldFont = static_cast<HFONT>(::SelectObject(hdcPaint, hFont));
+			HFONT hOldFont = static_cast<HFONT>(::SelectObject(hMemDC, hFont));
 
 			// calculate the size of the string, 'cx' represents width while 'cy' is height 
 			SIZE sRecv = { 0 };
 			SIZE sSend = { 0 };
-			::GetTextExtentPoint32W(hdcPaint, strRecv.c_str(), static_cast<int>(strRecv.length()), &sRecv);
-			::GetTextExtentPoint32W(hdcPaint, strSend.c_str(), static_cast<int>(strSend.length()), &sSend);
+			::GetTextExtentPoint32W(hMemDC, strRecv.c_str(), static_cast<int>(strRecv.length()), &sRecv);
+			::GetTextExtentPoint32W(hMemDC, strSend.c_str(), static_cast<int>(strSend.length()), &sSend);
 
 			// prepare rects of recv & send text
 			RECT rcRecv = { 0 };
@@ -111,23 +115,27 @@ LRESULT CNetViewWnd::OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL & bHa
 			rcRecv.right = rcRecv.left + sRecv.cx;
 			rcRecv.top = RECTHEIGHT(rc) / 2 + (RECTHEIGHT(rc) / 2 - sRecv.cy) / 2;
 			rcRecv.bottom = rcRecv.top + sRecv.cy;
-			
+
 			rcSend.left = (RECTWIDTH(rc) - sSend.cx) / 2;
 			rcSend.right = rcSend.left + sSend.cx;
 			rcSend.bottom = RECTHEIGHT(rc) / 2 - (RECTHEIGHT(rc) / 2 - sSend.cy) / 2;
 			rcSend.top = rcSend.bottom - sSend.cy;
-			
-
 
 			DTTOPTS dttOpts = { sizeof(dttOpts) };
 			dttOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
 			dttOpts.crText = RGB(250, 250, 250);
 			dttOpts.iGlowSize = 8;
-			::DrawThemeTextEx(hTheme, hdcPaint, 0, 0, strRecv.c_str(), -1, 0, &rcRecv, &dttOpts);
-			::DrawThemeTextEx(hTheme, hdcPaint, 0, 0, strSend.c_str(), -1, 0, &rcSend, &dttOpts);
+			::DrawThemeTextEx(hTheme, hMemDC, 0, 0, strRecv.c_str(), -1, 0, &rcRecv, &dttOpts);
+			::DrawThemeTextEx(hTheme, hMemDC, 0, 0, strSend.c_str(), -1, 0, &rcSend, &dttOpts);
+
+			//::BitBlt(hdc, ps.rcPaint.left, ps.rcPaint.top, RECTWIDTH(ps.rcPaint), RECTHEIGHT(ps.rcPaint), hMemDC, 0, 0, SRCCOPY);
+			::BitBlt(hdc, 0, 0, RECTWIDTH(rc), RECTHEIGHT(rc), hMemDC, 0, 0, SRCCOPY);
+
+			//::SelectObject(hMemDC, hOldFont);
+			::SelectObject(hMemDC, hOldMemBitMap);
+			::DeleteObject(hMemBitMap);
+			::DeleteDC(hMemDC);
 			
-			//::SelectObject(hdcPaint, hOldFont);
-			::EndBufferedPaint(hBufferedPaint, TRUE);
 			::CloseThemeData(hTheme);
 		}
 	}
@@ -149,11 +157,76 @@ LRESULT CNetViewWnd::OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL & bHa
 //		RECT rc = { 0 };
 //		GetClientRect(&rc);
 //
+//		HTHEME hTheme = ::OpenThemeData(NULL, L"TextStyle");
+//		if (hTheme)
+//		{
+//			HDC hdcPaint = NULL;
+//			HPAINTBUFFER hBufferedPaint = ::BeginBufferedPaint(hdc, &rc, BPBF_TOPDOWNDIB, NULL, &hdcPaint);
+//
+//			// before other operations, draw the background
+//			::DrawThemeParentBackground(m_hWnd, hdcPaint, &rc);
+//
+//			// set font
+//			HFONT hFont = ::CreateFontW(m_iHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, 0, ANSI_CHARSET, OUT_DEFAULT_PRECIS,
+//				CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"@system");
+//			HFONT hOldFont = static_cast<HFONT>(::SelectObject(hdcPaint, hFont));
+//
+//			// calculate the size of the string, 'cx' represents width while 'cy' is height 
+//			SIZE sRecv = { 0 };
+//			SIZE sSend = { 0 };
+//			::GetTextExtentPoint32W(hdcPaint, strRecv.c_str(), static_cast<int>(strRecv.length()), &sRecv);
+//			::GetTextExtentPoint32W(hdcPaint, strSend.c_str(), static_cast<int>(strSend.length()), &sSend);
+//
+//			// prepare rects of recv & send text
+//			RECT rcRecv = { 0 };
+//			RECT rcSend = { 0 };
+//			rcRecv.left = (RECTWIDTH(rc) - sRecv.cx) / 2;
+//			rcRecv.right = rcRecv.left + sRecv.cx;
+//			rcRecv.top = RECTHEIGHT(rc) / 2 + (RECTHEIGHT(rc) / 2 - sRecv.cy) / 2;
+//			rcRecv.bottom = rcRecv.top + sRecv.cy;
+//
+//			rcSend.left = (RECTWIDTH(rc) - sSend.cx) / 2;
+//			rcSend.right = rcSend.left + sSend.cx;
+//			rcSend.bottom = RECTHEIGHT(rc) / 2 - (RECTHEIGHT(rc) / 2 - sSend.cy) / 2;
+//			rcSend.top = rcSend.bottom - sSend.cy;
+//
+//
+//
+//			DTTOPTS dttOpts = { sizeof(dttOpts) };
+//			dttOpts.dwFlags = DTT_COMPOSITED | DTT_TEXTCOLOR | DTT_GLOWSIZE;
+//			dttOpts.crText = RGB(250, 250, 250);
+//			dttOpts.iGlowSize = 8;
+//			::DrawThemeTextEx(hTheme, hdcPaint, 0, 0, strRecv.c_str(), -1, 0, &rcRecv, &dttOpts);
+//			::DrawThemeTextEx(hTheme, hdcPaint, 0, 0, strSend.c_str(), -1, 0, &rcSend, &dttOpts);
+//
+//			//::SelectObject(hdcPaint, hOldFont);
+//			::EndBufferedPaint(hBufferedPaint, TRUE);
+//			::CloseThemeData(hTheme);
+//		}
+//	}
+//
+//	EndPaint(&ps);	// marks the end of painting in the specified window
+//	return LRESULT(0);
+//}
+
+//LRESULT CNetViewWnd::OnPaint(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL & bHandle)
+//{
+//	PAINTSTRUCT ps = { 0 };
+//	HDC hdc = BeginPaint(&ps);	//  prepares the specified window for painting &  fills a PAINTSTRUCT structure with information about the painting.
+//
+//	std::wstring strRecv = m_NetViewUtil.GetRecvSpeed();
+//	std::wstring strSend = m_NetViewUtil.GetSendSpeed();
+//
+//	if (hdc)
+//	{
+//		RECT rc = { 0 };
+//		GetClientRect(&rc);
+//
 //		HDC hdcPaint = NULL;
 //		HPAINTBUFFER hBufferedPaint = ::BeginBufferedPaint(hdc, &rc, BPBF_TOPDOWNDIB, NULL, &hdcPaint);
 //
 //		// before other operations, draw the background
-//		::DrawThemeParentBackground(m_hWnd, hdcPaint, &rc);
+//		//::DrawThemeParentBackground(m_hWnd, hdcPaint, &rc);
 //
 //		// set font
 //		LOGFONT logFont = { 0 };
