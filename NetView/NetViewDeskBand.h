@@ -76,41 +76,41 @@ public:
 
 	// IObjectWithSite
 	//
-	STDMETHODIMP SetSite(_In_opt_ IUnknown *pUnkSite);
+	STDMETHOD(SetSite)(_In_opt_ IUnknown *pUnkSite);
 
 	// IOleWindow
 	//
-	STDMETHODIMP GetWindow(__RPC__deref_out_opt HWND *phwnd);
+	STDMETHOD(GetWindow)(__RPC__deref_out_opt HWND *phwnd);
 
-	STDMETHODIMP ContextSensitiveHelp(BOOL fEnterMode);
+	STDMETHOD(ContextSensitiveHelp)(BOOL fEnterMode);
 
 	// IDockingWindow
 	//
-	STDMETHODIMP ShowDW(BOOL fShow);
+	STDMETHOD(ShowDW)(BOOL fShow);
 
-	STDMETHODIMP CloseDW(DWORD dwReserved);
+	STDMETHOD(CloseDW)(DWORD dwReserved);
 
-	STDMETHODIMP ResizeBorderDW(__RPC__in_opt LPCRECT prcBorder, __RPC__in_opt IUnknown *punkToolbarSite, BOOL fReserved);
+	STDMETHOD(ResizeBorderDW)(__RPC__in_opt LPCRECT prcBorder, __RPC__in_opt IUnknown *punkToolbarSite, BOOL fReserved);
 
 	// IDeskBand
 	//
-	STDMETHODIMP GetBandInfo(DWORD dwBandID, DWORD dwViewMode, __RPC__inout DESKBANDINFO *pdbi);
+	STDMETHOD(GetBandInfo)(DWORD dwBandID, DWORD dwViewMode, __RPC__inout DESKBANDINFO *pdbi);
 
 	// IDeskBand2
 	//
-	STDMETHODIMP CanRenderComposited(__RPC__out BOOL *pfCanRenderComposited);
+	STDMETHOD(CanRenderComposited)(__RPC__out BOOL *pfCanRenderComposited);
 
-	STDMETHODIMP SetCompositionState(BOOL fCompositionEnabled);
+	STDMETHOD(SetCompositionState)(BOOL fCompositionEnabled);
 
-	STDMETHODIMP GetCompositionState(__RPC__out BOOL *pfCompositionEnabled);
+	STDMETHOD(GetCompositionState)(__RPC__out BOOL *pfCompositionEnabled);
 
 	// IInputObject
 	//
-	STDMETHODIMP UIActivateIO(BOOL fActivate, __RPC__in_opt MSG *pMsg);
+	STDMETHOD(UIActivateIO)(BOOL fActivate, __RPC__in_opt MSG *pMsg);
 
-	STDMETHODIMP HasFocusIO(void);
+	STDMETHOD(HasFocusIO)(void);
 
-	STDMETHODIMP TranslateAcceleratorIO(__RPC__in MSG *pMsg);
+	STDMETHOD(TranslateAcceleratorIO)(__RPC__in MSG *pMsg);
 
 	BOOL        m_bRequiresSave;
 
