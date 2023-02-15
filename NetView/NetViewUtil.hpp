@@ -1,39 +1,56 @@
 #pragma once
-#include <WinSock2.h>
-#include <IPHlpApi.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#pragma comment(lib, "IPHLPAPI.lib")
+
+#include <iphlpapi.h>
+
+#include <format>
 #include <string>
 #include <vector>
-#include <codecvt>
 
-#pragma comment(lib, "IPHlpApi.lib")
 
 #define MALLOC(x) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (x))
 #define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
+template<typename T1, typename T2>
+constexpr auto SafeSub(T1 x, T2  y) { return ((x > y) ? x - y : 0); }
+
+constexpr ULONG64 HUNDRED = 100;
+constexpr ULONG64 KB = 1 << 10;
+constexpr ULONG64 MB = 1 << 20;
+constexpr ULONG64 GB = 1 << 30;
+
+// utility wrapper to adapt locale-bound facets for wstring/wbuffer convert
+template<class Facet>
+struct deletable_facet : Facet
+{
+	template<class... Args>
+	deletable_facet(Args&&... args) : Facet(std::forward<Args>(args)...) {}
+	~deletable_facet() {}
+};
+
 
 class CNetViewUtil
 {
 public:
 	CNetViewUtil()
-		: m_bFirst(TRUE)
-		, m_pIfTable(nullptr)
-		, m_dwPreInOctets(0)
-		, m_dwPreOutOctets(0)
-		, m_dwPreTime(GetCurrentTime())
+		: m_pIfTable(nullptr)
+		, m_dwSize(sizeof(MIB_IFTABLE))
+		, m_ulTotalRecvBytes (0)
+		, m_ulTotalSendBytes (0)
+		, m_ulPreTime(GetTickCount64())
 	{
-		m_dwSize = sizeof(MIB_IFTABLE);
-
 		m_pIfTable = reinterpret_cast<PMIB_IFTABLE>(MALLOC(m_dwSize));
-		if (m_pIfTable == nullptr)
-		{
+		if (m_pIfTable == nullptr) {
 			return;
 		}
-		if (GetIfTable(m_pIfTable, &m_dwSize, FALSE) == ERROR_INSUFFICIENT_BUFFER)
-		{
+
+		if (GetIfTable(m_pIfTable, &m_dwSize, FALSE) == ERROR_INSUFFICIENT_BUFFER) {
 			FREE(m_pIfTable);
 			// realloc memory
 			m_pIfTable = reinterpret_cast<PMIB_IFTABLE>(MALLOC(m_dwSize));
-			if (m_pIfTable == nullptr)
-			{
+			if (m_pIfTable == nullptr) {
 				return;
 			}
 		}
@@ -50,143 +67,143 @@ public:
 		}
 	}
 
+	void UpdateNetOctets(void)
+	{
+		ULONG64 ulTotalRecvBytes = 0;
+		ULONG64 ulTotalSendBytes = 0;
+		ULONG64	ulTime = GetTickCount64();	// record current time in order to caculate speed
+		BOOL ret = CalculateNetOctets(ulTotalRecvBytes, ulTotalSendBytes);
+		if (ret == FALSE) {
+			return;
+		}
+
+		// once when bytes reach 0xFFFFFFFF, it will return to 0.
+		ULONG64 curRecvBytes = SafeSub(ulTotalRecvBytes, m_ulTotalRecvBytes);		// download
+		ULONG64 curSendBytes = SafeSub(ulTotalSendBytes, m_ulTotalSendBytes);      // upload
+		DOUBLE dTime = (static_cast<DOUBLE>(ulTime - m_ulPreTime) / 1000.0f);
+		if (m_ulTotalRecvBytes != 0) {
+			m_strRecvSpeed = TransNetOctets2Wstr(curRecvBytes, dTime, L"\x2193");
+		}
+		if (m_ulTotalSendBytes != 0) {
+			m_strSendSpeed = TransNetOctets2Wstr(curSendBytes, dTime, L"\x2191");
+		}
+
+		// save previous in/out octets
+		m_ulTotalRecvBytes = ulTotalRecvBytes;
+		m_ulTotalSendBytes = ulTotalSendBytes;
+		m_ulPreTime = ulTime;
+	}
+
+	inline	const std::wstring GetRecvSpeed() const { return m_strRecvSpeed; }		// 返回RecvSpeed
+	inline	const std::wstring GetSendSpeed() const { return m_strSendSpeed; }		// 返回SendSpeed
+
+private:
+
+	std::string Wstr2Str(std::wstring wstr)
+	{
+		std::string str;
+		int ret = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), lstrlenW(wstr.data()), NULL, 0, NULL, NULL);
+		if (ret <= 0) {
+			return std::string();
+		}
+
+		str.resize(ret + 10);
+		ret = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), lstrlenW(wstr.data()), &str[0], (int)str.size(), NULL, NULL);
+		if (ret <= 0) {
+			return std::string();
+		}
+		return str;
+	}
+
+	bool IsAdapterInuse(std::string strAdapterName)
+	{
+		if (strAdapterName.empty()) {
+			return false;
+		}
+
+		for (const auto& i : m_vecAdapterName) {
+			size_t index = strAdapterName.find(i);
+			if (index != strAdapterName.length() && index >= 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	void StoreAdapterInfo(void)
 	{
 		DWORD size = sizeof(IP_ADAPTER_ADDRESSES);
 		PIP_ADAPTER_ADDRESSES pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(MALLOC(size));
-		if (pAddresses == nullptr)
-		{
+		if (pAddresses == nullptr) {
 			return;
 		}
 
-		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == ERROR_BUFFER_OVERFLOW)
-		{
+		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == ERROR_BUFFER_OVERFLOW) {
 			FREE(pAddresses);
 			pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(MALLOC(size));
-			if (pAddresses == nullptr)
-			{
+			if (pAddresses == nullptr) {
 				return;
 			}
 		}
 
-		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == NO_ERROR)
-		{
-			for (PIP_ADAPTER_ADDRESSES pCurrentAddresses = pAddresses; pCurrentAddresses != nullptr; pCurrentAddresses = pCurrentAddresses->Next)
-			{
-				m_vecAdapterName.push_back(pCurrentAddresses->AdapterName);
+		if (GetAdaptersAddresses(AF_UNSPEC, 0, NULL, pAddresses, &size) == NO_ERROR) {
+			for (PIP_ADAPTER_ADDRESSES pCurrentAddresses = pAddresses;
+				pCurrentAddresses != nullptr;
+				pCurrentAddresses = pCurrentAddresses->Next) {
+				m_vecAdapterName.emplace_back(pCurrentAddresses->AdapterName);
 			}
 		}
 
 		FREE(pAddresses);
 	}
 
-	std::string wstr2str(std::wstring wstr)
+	BOOL CalculateNetOctets(ULONG64& ulTotalRecvBytes, ULONG64& ulTotalSendBytes)
 	{
-		// consider the my system's GBK
-		typedef std::codecvt_byname<wchar_t, char, std::mbstate_t> cvt_facet;
-		std::wstring_convert<cvt_facet> conv(new cvt_facet(".936"));
-		std::string str = conv.to_bytes(wstr);
-		return (!str.empty()) ? str : std::string();
-	}
-
-	bool IsAdapterInuse(std::string strAdapterName)
-	{
-		if (strAdapterName.empty()) return false;
-
-		for (auto i : m_vecAdapterName)
-		{
-			int index = strAdapterName.find(i);
-			if (index != strAdapterName.length() && index >= 0) return true;
+		if (m_pIfTable == nullptr) {
+			return FALSE;
 		}
-		return false;
-	}
 
-	void CalculateNetOctets(void)
-	{
-		if (m_pIfTable == nullptr) return;
-
-		DWORD	dwInOctets = 0;			// total received 
-		DWORD	dwOutOctets = 0;		// total sent
-		DOUBLE	CurrentInOctets = 0;	// this time received
-		DOUBLE	CurrentOutOctets = 0;	// this time sent
-		DWORD	dwTime = GetCurrentTime();	// record current time in order to caculate speed
-		if (GetIfTable(m_pIfTable, &m_dwSize, FALSE) != NO_ERROR)
-		{
-			return;
+		if (GetIfTable(m_pIfTable, &m_dwSize, FALSE) != NO_ERROR) {
+			return FALSE;
 		}
 		// Caculate all octets 
-		for (DWORD i = 0; i < m_pIfTable->dwNumEntries; i++)
-		{
+		for (DWORD i = 0; i < m_pIfTable->dwNumEntries; i++) {
 			PMIB_IFROW pIfRow = &m_pIfTable->table[i];
 
 			// transform wchar to char
-			if (IsAdapterInuse(wstr2str(pIfRow->wszName)))
-			{
-				dwInOctets += pIfRow->dwInOctets;
-				dwOutOctets += pIfRow->dwOutOctets;
+			if (IsAdapterInuse(Wstr2Str(pIfRow->wszName))) {
+				ulTotalRecvBytes += pIfRow->dwInOctets;
+				ulTotalSendBytes += pIfRow->dwOutOctets;
 			}
 		}
 
-		// once when InOctects reach 0xFFFFFFFF, it will return to 0.
-
-		CurrentInOctets = static_cast<DOUBLE>(m_dwPreInOctets < 0 ? 0 : dwInOctets - m_dwPreInOctets);	// download
-		CurrentOutOctets = static_cast<DOUBLE>(m_dwPreOutOctets < 0 ? 0 : dwOutOctets - m_dwPreOutOctets); // upload
-		
-		if (m_bFirst)
-		{
-			m_strRecvSpeed = L"↓ 0 B/s";
-			m_strSendSpeed = L"↑ 0 B/s";
-			m_bFirst = FALSE;
-		}
-		else
-		{
-			DOUBLE dTime = (static_cast<DOUBLE>(dwTime - m_dwPreTime) / 1000.0f);
-			// transform unit for recv(download speed)
-			if (CurrentInOctets / 1000 < 1)		// B/s
-			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"↓ %.0lf B/s", CurrentInOctets / dTime);
-			}
-			else if (CurrentInOctets / (1000 * 1000) < 1)	// KB/s
-			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"↓ %.0lf KB/s", (CurrentInOctets / 1000) / dTime);
-			}
-			else  // MB/s			generally, net speed will be smaller than GB/s, so I won't consider more than MB/s.
-			{
-				m_strRecvSpeed = std::_Floating_to_wstring(L"↓ %.1lf MB/s", (CurrentInOctets / (1000 * 1000)) / dTime);
-			}
-			// transform unit for send(upload speed)
-			if (CurrentOutOctets / 1000 < 1)		// B/s
-			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"↑ %.0lf B/s", CurrentOutOctets / dTime);
-			}
-			else if (CurrentOutOctets / (1000 * 1000) < 1)	// KB/s
-			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"↑ %.0lf KB/s", (CurrentOutOctets / 1000) / dTime);
-			}
-			else  // MB/s			generally, net speed will be smaller than GB/s, so I won't consider more than MB/s.
-			{
-				m_strSendSpeed = std::_Floating_to_wstring(L"↑ %.1lf MB/s", (CurrentOutOctets / (1000 * 1000)) / dTime);
-			}
-		}
-
-		// save previous in/out octets
-		m_dwPreInOctets = dwInOctets;
-		m_dwPreOutOctets = dwOutOctets;
-		m_dwPreTime = dwTime;
+		return TRUE;
 	}
 
-	inline	std::wstring GetRecvSpeed() { return m_strRecvSpeed; }		// 返回RecvSpeed
-	inline	std::wstring GetSendSpeed() { return m_strSendSpeed; }		// 返回SendSpeed
+	std::wstring TransNetOctets2Wstr(ULONG64 traffic, DOUBLE dTime, const std::wstring& arrow)
+	{
+		std::wstring ret;
+		ULONG64 trafficPerSec = traffic * HUNDRED / (ULONG64)dTime / HUNDRED;
+		if (trafficPerSec < KB) {
+			ret = arrow + std::to_wstring(trafficPerSec) + L" B/s";
+		} else if (traffic < MB) {
+			ret = arrow.data() + std::to_wstring(trafficPerSec / KB) + L" KB/s";
+		} else if (traffic < GB) {
+			ret = arrow.data() + std::to_wstring(trafficPerSec / MB) + L" MB/s";
+		} else {
+			ret = //std::format(L"{} {:.2f} GB/s", arrow.data(), 1.0 * traffic / dTime / GB);
+				arrow.data() + std::to_wstring(trafficPerSec / GB) + L" GB/s";
+		}
 
-private:
-	BOOL			m_bFirst;
+		return ret;
+	}
+
 	PMIB_IFTABLE	m_pIfTable;
 	DWORD			m_dwSize;
-	DWORD			m_dwPreInOctets;		// previous received the number of octets of data 
-	DWORD			m_dwPreOutOctets;		// previous sent ... 
-	DWORD			m_dwPreTime;			// previous time
+	ULONG64			m_ulTotalRecvBytes;		// previous recv the number of octets of data 
+	ULONG64			m_ulTotalSendBytes;		// previous send ... 
+	ULONG64			m_ulPreTime;			// previous time
 	std::wstring	m_strRecvSpeed;
 	std::wstring	m_strSendSpeed;
-
 	std::vector<std::string> m_vecAdapterName;
 };
